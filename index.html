@@ -42,13 +42,14 @@
     body {
       display: grid;
       place-items: center;
-      padding: 12px;
+      padding: calc(12px + env(safe-area-inset-top, 0px)) 12px calc(12px + env(safe-area-inset-bottom, 0px));
     }
 
     .app {
       position: relative;
       width: min(100vw - 24px, 500px);
-      height: min(100vh - 24px, 900px);
+      height: min(calc(100dvh - 24px - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)), 900px);
+      min-height: 620px;
       border-radius: 28px;
       overflow: hidden;
       border: 1px solid rgba(255, 255, 255, 0.16);
@@ -325,6 +326,7 @@
   </div>
 
   <script>
+    const appEl = document.querySelector(".app");
     const canvas = document.getElementById("game");
     const ctx = canvas.getContext("2d");
 
@@ -338,15 +340,26 @@
     const overlay = document.getElementById("overlay");
     const startBtn = document.getElementById("startBtn");
 
-    const width = canvas.width;
-    const height = canvas.height;
+    let width = canvas.width;
+    let height = canvas.height;
 
     const brickRows = 10;
     const brickCols = 10;
     const brickGap = 6;
     const brickHeight = 22;
-    const topPadding = 92;
     const sidePadding = 16;
+
+    function getTopPadding() {
+      return Math.max(78, Math.min(96, height * 0.11));
+    }
+
+    function getBottomPlayInset() {
+      return Math.max(52, Math.min(82, height * 0.09));
+    }
+
+    function getSpawnY() {
+      return height - getBottomPlayInset() - 46;
+    }
 
     const bonusTypes = {
       wide: { color: "#46e1ff", label: "Raquette +", icon: "W" },
@@ -489,7 +502,7 @@
       },
       paddle: {
         x: width / 2 - 62,
-        y: height - 44,
+        y: height - getBottomPlayInset(),
         width: 124,
         height: 18,
         speed: 0.22,
@@ -527,7 +540,8 @@
       state.touchState.anchorClientX = 0;
       state.touchState.anchorPaddleX = state.paddle.x;
       state.touchState.targetX = state.paddle.x;
-      state.balls = [createBall(width / 2, height - 110, 4.8, -6.2)];
+      state.paddle.y = height - getBottomPlayInset();
+      state.balls = [createBall(width / 2, getSpawnY(), 4.8, -6.2)];
       state.ballLocked = true;
       buildLevel();
       updateHud();
@@ -564,6 +578,7 @@
       state.levelConfig = getLevelConfig(state.level);
       state.currentAnimal = animalLevels[(state.level - 1) % animalLevels.length];
       const brickWidth = (width - sidePadding * 2 - brickGap * (brickCols - 1)) / brickCols;
+      const topPadding = getTopPadding();
       state.bricks = [];
 
       for (let row = 0; row < brickRows; row += 1) {
@@ -890,7 +905,7 @@
       const step = Math.max(-maxStep, Math.min(maxStep, delta));
       state.paddle.x += step;
       state.paddle.x = Math.max(0, Math.min(width - state.paddle.width, state.paddle.x));
-      state.paddle.y = height - 44;
+      state.paddle.y = height - getBottomPlayInset();
 
       if (state.ballLocked && state.balls[0]) {
         lockBallToPaddle(state.balls[0]);
@@ -1009,7 +1024,7 @@
         state.missiles = [];
         state.levelConfig = getLevelConfig(state.level);
         state.paddle.width = state.effects.wideUntil > now ? 178 : state.levelConfig.paddleWidth;
-        state.balls = [createBall(width / 2, height - 110, 5 + Math.min(state.level, 7) * 0.2, -6.4 - Math.min(state.level, 6) * 0.16)];
+        state.balls = [createBall(width / 2, getSpawnY(), 5 + Math.min(state.level, 7) * 0.2, -6.4 - Math.min(state.level, 6) * 0.16)];
         state.ballLocked = true;
         buildLevel();
         if (state.balls[0]) {
@@ -1023,7 +1038,7 @@
 
       if (state.balls.length === 0) {
         if (shieldActive) {
-          state.balls = [createBall(width / 2, height - 110, 4.8, -6.2)];
+          state.balls = [createBall(width / 2, getSpawnY(), 4.8, -6.2)];
           state.ballLocked = true;
           lockBallToPaddle(state.balls[0]);
           statusEl.classList.remove("hidden");
@@ -1035,7 +1050,7 @@
             endGame();
             return;
           }
-          state.balls = [createBall(width / 2, height - 110, 4.8, -6.2)];
+          state.balls = [createBall(width / 2, getSpawnY(), 4.8, -6.2)];
           state.ballLocked = true;
           lockBallToPaddle(state.balls[0]);
           statusEl.classList.remove("hidden");
@@ -1387,6 +1402,52 @@
       state.pointerX = (clientX - rect.left) * ratio;
     }
 
+    function resizeGame() {
+      const nextWidth = Math.max(320, Math.round(appEl.clientWidth));
+      const nextHeight = Math.max(620, Math.round(appEl.clientHeight));
+      const prevWidth = width;
+      const prevHeight = height;
+
+      if (nextWidth === width && nextHeight === height) return;
+
+      width = nextWidth;
+      height = nextHeight;
+      canvas.width = width;
+      canvas.height = height;
+
+      if (prevWidth > 0) {
+        const maxPrevX = Math.max(1, prevWidth - state.paddle.width);
+        const maxNextX = Math.max(0, width - state.paddle.width);
+        state.paddle.x = Math.max(0, Math.min(maxNextX, (state.paddle.x / maxPrevX) * maxNextX));
+      }
+
+      state.paddle.y = height - getBottomPlayInset();
+      state.pointerX = state.paddle.x + state.paddle.width / 2;
+      state.touchState.targetX = state.paddle.x;
+      state.touchState.anchorPaddleX = state.paddle.x;
+
+      if (state.ballLocked && state.balls[0]) {
+        lockBallToPaddle(state.balls[0]);
+      } else if (prevWidth > 0 && prevHeight > 0) {
+        const scaleX = width / prevWidth;
+        const scaleY = height / prevHeight;
+        state.balls.forEach((ball) => {
+          ball.x *= scaleX;
+          ball.y *= scaleY;
+          ball.trail = [];
+        });
+        state.bonuses.forEach((bonus) => {
+          bonus.x *= scaleX;
+          bonus.y *= scaleY;
+        });
+        state.missiles.forEach((missile) => {
+          missile.x *= scaleX;
+          missile.y *= scaleY;
+        });
+      }
+
+    }
+
     function updateTouchTarget(event, isStart = false) {
       const rect = canvas.getBoundingClientRect();
       const ratio = width / rect.width;
@@ -1481,6 +1542,11 @@
       resetGame();
     });
 
+    resizeGame();
+    window.addEventListener("resize", resizeGame);
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", resizeGame);
+    }
     resetGame();
     state.running = false;
     requestAnimationFrame(frame);
