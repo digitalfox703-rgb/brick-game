@@ -902,14 +902,16 @@
       const slowFactor = state.effects.slowUntil > now ? 0.78 : 1;
       const levelSpeed = state.levelConfig.speedScale;
       const shieldActive = state.effects.shieldUntil > now;
+      const magnetActive = state.effects.magnetUntil > now;
 
       for (let i = state.balls.length - 1; i >= 0; i -= 1) {
         const ball = state.balls[i];
-        if (state.effects.magnetUntil > now && ball.vy > 0) {
+        if (magnetActive && ball.vy > 0) {
           const targetX = state.paddle.x + state.paddle.width / 2;
           const targetY = state.paddle.y - 8;
           ball.vx += (targetX - ball.x) * 0.0032;
           ball.vy += (targetY - ball.y) * 0.0014;
+          ball.vy = Math.max(ball.vy, 3.8);
           const maxMagnetSpeed = 8.6;
           const magnetSpeed = Math.hypot(ball.vx, ball.vy);
           if (magnetSpeed > maxMagnetSpeed) {
@@ -937,8 +939,9 @@
         }
 
         const paddle = state.paddle;
-        const defenseX = shieldActive ? 0 : paddle.x;
-        const defenseWidth = shieldActive ? width : paddle.width;
+        const magnetCatchPadding = magnetActive && !shieldActive ? 26 : 0;
+        const defenseX = shieldActive ? 0 : paddle.x - magnetCatchPadding;
+        const defenseWidth = shieldActive ? width : paddle.width + magnetCatchPadding * 2;
         if (
           ball.y + ball.radius >= paddle.y &&
           ball.y - ball.radius <= paddle.y + paddle.height + (shieldActive ? 6 : 0) &&
@@ -950,13 +953,14 @@
           if (shieldActive && (ball.x < paddle.x || ball.x > paddle.x + paddle.width)) {
             hit = ((ball.x / width) - 0.5) * 1.4;
           } else {
-            hit = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+            const contactX = Math.max(paddle.x, Math.min(paddle.x + paddle.width, ball.x));
+            hit = (contactX - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
           }
           hit = Math.max(-1, Math.min(1, hit));
           ball.vx = hit * (5.6 + Math.min(1.7, state.level * 0.12));
           ball.vy = -Math.max(5.8, 6.9 - Math.abs(hit) + Math.min(1.1, state.level * 0.06));
           ball.y = paddle.y - ball.radius - 1;
-          if (state.effects.magnetUntil > now) {
+          if (magnetActive) {
             ball.vx *= 0.55;
           }
           playSound("paddle");
