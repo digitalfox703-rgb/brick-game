@@ -421,6 +421,14 @@
       levelConfig: null,
       currentAnimal: animalLevels[0],
       ballLocked: true,
+      inputMode: "mouse",
+      touchState: {
+        active: false,
+        pointerId: null,
+        anchorClientX: 0,
+        anchorPaddleX: 0,
+        targetX: width / 2 - 62
+      },
       paddle: {
         x: width / 2 - 62,
         y: height - 44,
@@ -456,6 +464,11 @@
       state.levelConfig = getLevelConfig(1);
       state.paddle.width = state.levelConfig.paddleWidth;
       state.paddle.x = width / 2 - state.paddle.width / 2;
+      state.touchState.active = false;
+      state.touchState.pointerId = null;
+      state.touchState.anchorClientX = 0;
+      state.touchState.anchorPaddleX = state.paddle.x;
+      state.touchState.targetX = state.paddle.x;
       state.balls = [createBall(width / 2, height - 110, 4.8, -6.2)];
       state.ballLocked = true;
       buildLevel();
@@ -771,10 +784,22 @@
       state.paddle.x = Math.max(0, Math.min(width - state.paddle.width, state.paddle.x));
       if (state.keys.left || state.keys.right) {
         state.pointerX = state.paddle.x + state.paddle.width / 2;
+        state.touchState.targetX = state.paddle.x;
       }
 
-      const targetX = Math.max(0, Math.min(width - state.paddle.width, state.pointerX - state.paddle.width / 2));
-      state.paddle.x += (targetX - state.paddle.x) * state.paddle.speed;
+      let targetX = Math.max(0, Math.min(width - state.paddle.width, state.pointerX - state.paddle.width / 2));
+      let smoothing = state.paddle.speed;
+      let maxStep = 24;
+
+      if (state.inputMode === "touch") {
+        targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
+        smoothing = 0.16;
+        maxStep = 12;
+      }
+
+      const delta = (targetX - state.paddle.x) * smoothing;
+      const step = Math.max(-maxStep, Math.min(maxStep, delta));
+      state.paddle.x += step;
       state.paddle.x = Math.max(0, Math.min(width - state.paddle.width, state.paddle.x));
       state.paddle.y = height - 44;
 
@@ -1226,12 +1251,61 @@
       state.pointerX = (clientX - rect.left) * ratio;
     }
 
-    canvas.addEventListener("pointermove", (event) => setPointer(event.clientX));
+    function updateTouchTarget(event, isStart = false) {
+      const rect = canvas.getBoundingClientRect();
+      const ratio = width / rect.width;
+      const deadZone = 10 * ratio;
+
+      if (isStart) {
+        state.touchState.active = true;
+        state.touchState.pointerId = event.pointerId;
+        state.touchState.anchorClientX = event.clientX;
+        state.touchState.anchorPaddleX = state.paddle.x;
+        state.touchState.targetX = state.paddle.x;
+        return;
+      }
+
+      if (!state.touchState.active || state.touchState.pointerId !== event.pointerId) return;
+
+      const deltaX = (event.clientX - state.touchState.anchorClientX) * ratio;
+      const adjustedDelta = Math.abs(deltaX) <= deadZone
+        ? 0
+        : deltaX - Math.sign(deltaX) * deadZone;
+      state.touchState.targetX = state.touchState.anchorPaddleX + adjustedDelta * 0.88;
+      state.touchState.targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
+      state.pointerX = state.touchState.targetX + state.paddle.width / 2;
+    }
+
+    function endTouchControl(event) {
+      if (state.touchState.pointerId !== event.pointerId) return;
+      state.touchState.active = false;
+      state.touchState.pointerId = null;
+      state.touchState.anchorPaddleX = state.paddle.x;
+      state.touchState.targetX = state.paddle.x;
+    }
+
+    canvas.addEventListener("pointermove", (event) => {
+      if (event.pointerType === "touch") {
+        state.inputMode = "touch";
+        updateTouchTarget(event);
+        return;
+      }
+      state.inputMode = "mouse";
+      setPointer(event.clientX);
+    });
     canvas.addEventListener("pointerdown", (event) => {
       ensureAudio();
-      setPointer(event.clientX);
+      if (event.pointerType === "touch") {
+        state.inputMode = "touch";
+        updateTouchTarget(event, true);
+      } else {
+        state.inputMode = "mouse";
+        setPointer(event.clientX);
+      }
       tryLaunchFromTap();
     });
+    canvas.addEventListener("pointerup", endTouchControl);
+    canvas.addEventListener("pointercancel", endTouchControl);
 
     window.addEventListener("keydown", (event) => {
       if (event.key === "ArrowLeft") {
