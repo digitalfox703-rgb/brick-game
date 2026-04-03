@@ -905,7 +905,7 @@
 
       for (let i = state.balls.length - 1; i >= 0; i -= 1) {
         const ball = state.balls[i];
-        if (state.effects.magnetUntil > now) {
+        if (state.effects.magnetUntil > now && ball.vy > 0) {
           const targetX = state.paddle.x + state.paddle.width / 2;
           const targetY = state.paddle.y - 8;
           ball.vx += (targetX - ball.x) * 0.0032;
