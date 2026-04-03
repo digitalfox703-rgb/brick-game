@@ -257,6 +257,65 @@
       vertical-align: middle;
     }
 
+    .leaderboard {
+      margin: 16px 0 12px;
+      padding: 14px 14px 12px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      text-align: left;
+    }
+
+    .leaderboard h2 {
+      margin: 0 0 8px;
+      font-size: 0.9rem;
+      color: #ffe28f;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .leaderboard p {
+      margin: 0;
+      font-size: 0.85rem;
+      color: #cfe0ff;
+    }
+
+    .leaderboard-list {
+      display: grid;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .leaderboard-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 7px 10px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      color: #f8fbff;
+      font-size: 0.88rem;
+    }
+
+    .leaderboard-rank {
+      color: #ffe28f;
+      font-weight: 700;
+      margin-right: 8px;
+    }
+
+    .leaderboard-name {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .leaderboard-score {
+      color: #9de7ff;
+      font-weight: 700;
+    }
+
     button {
       pointer-events: auto;
       border: 0;
@@ -320,6 +379,7 @@
           <div><span style="background:#7affd8"></span>Menthe : aimant</div>
         </div>
         <p>Casse les briques, attrape les bonus et joue au doigt, a la souris ou avec les fleches du clavier.</p>
+        <div class="leaderboard" id="leaderboard"></div>
         <button id="startBtn">Jouer</button>
       </div>
     </div>
@@ -338,6 +398,9 @@
     const statusEl = document.getElementById("status");
     const bonusRackEl = document.getElementById("bonusRack");
     const overlay = document.getElementById("overlay");
+    const leaderboardEl = document.getElementById("leaderboard");
+    const cardTitleEl = document.querySelector(".card h1");
+    const cardTextEl = document.querySelector(".card p");
     const startBtn = document.getElementById("startBtn");
 
     let width = canvas.width;
@@ -371,6 +434,8 @@
       magnet: { color: "#7affd8", label: "Aimant", icon: "A" },
       missile: { color: "#ff5252", label: "Missiles", icon: "T" }
     };
+
+    const LEADERBOARD_KEY = "brick-color-splash-top3";
 
     const levelFlavors = [
       "On commence doucement",
@@ -561,6 +626,73 @@
         baseVy: vy,
         trail: []
       };
+    }
+
+    function loadLeaderboard() {
+      try {
+        const raw = localStorage.getItem(LEADERBOARD_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .filter((entry) => entry && typeof entry.name === "string" && Number.isFinite(entry.score))
+          .map((entry) => ({
+            name: entry.name.trim().slice(0, 18) || "Joueur",
+            score: Math.round(entry.score)
+          }))
+          .sort((a, b) => b.score - a.score)
+          .slice(0, 3);
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveLeaderboard(entries) {
+      try {
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, 3)));
+      } catch (error) {
+      }
+    }
+
+    function renderLeaderboard(message) {
+      const visibleEntries = loadLeaderboard().filter((entry) => entry.score > 7500).slice(0, 3);
+      if (visibleEntries.length === 0) {
+        leaderboardEl.innerHTML =
+          "<h2>Top 3</h2><p>" + (message || "Passe 7500 pour entrer dans le tableau.") + "</p>";
+        return;
+      }
+
+      leaderboardEl.innerHTML =
+        "<h2>Top 3</h2>" +
+        (message ? "<p>" + message + "</p>" : "") +
+        '<div class="leaderboard-list">' +
+        visibleEntries.map((entry, index) =>
+          '<div class="leaderboard-item"><span class="leaderboard-rank">#' + (index + 1) +
+          '</span><span class="leaderboard-name">' + entry.name +
+          '</span><span class="leaderboard-score">' + entry.score + "</span></div>"
+        ).join("") +
+        "</div>";
+    }
+
+    function maybeSaveLeaderboardScore(score) {
+      const leaderboard = loadLeaderboard();
+      if (score <= 7000) return { added: false, board: leaderboard };
+      if (leaderboard.length >= 3 && score <= leaderboard[leaderboard.length - 1].score) {
+        return { added: false, board: leaderboard };
+      }
+
+      const firstName = window.prompt("Top 3 possible. Ton prenom ?", "") || "";
+      const cleanName = firstName.trim().replace(/\s+/g, " ").slice(0, 18);
+      if (!cleanName) {
+        return { added: false, board: leaderboard, skipped: true };
+      }
+
+      const nextBoard = leaderboard
+        .concat({ name: cleanName, score: Math.round(score) })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+
+      saveLeaderboard(nextBoard);
+      return { added: true, board: nextBoard, name: cleanName };
     }
 
     function getLevelConfig(level) {
@@ -1341,10 +1473,18 @@
     function endGame() {
       state.running = false;
       playSound("gameOver");
+      const leaderboardResult = maybeSaveLeaderboardScore(state.score);
       statusEl.classList.remove("hidden");
       statusEl.textContent = "On remet ca ? Cette fois tu connais le jeu.";
-      document.querySelector(".card h1").textContent = "Fin de run";
-      document.querySelector(".card p").textContent = "Score final: " + state.score + " points. Franchement, on peut faire encore plus sale au prochain essai.";
+      cardTitleEl.textContent = "Fin de run";
+      cardTextEl.textContent = "Score final: " + state.score + " points. Franchement, on peut faire encore plus sale au prochain essai.";
+      if (leaderboardResult.added) {
+        renderLeaderboard(leaderboardResult.name + " entre dans le Top 3.");
+      } else if (state.score > 7000) {
+        renderLeaderboard("Beau score. Il fallait un peu plus pour rentrer dans le Top 3.");
+      } else {
+        renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
+      }
       overlay.classList.remove("hidden");
       startBtn.textContent = "Rejouer";
       updateHud();
@@ -1535,8 +1675,9 @@
 
     startBtn.addEventListener("click", () => {
       ensureAudio();
-      document.querySelector(".card h1").textContent = "Brick Color Splash";
-      document.querySelector(".card p").textContent = "Un casse-briques vertical, vif et rapide avec bonus a attraper.";
+      cardTitleEl.textContent = "Brick Color Splash";
+      cardTextEl.textContent = "Un casse-briques vertical, vif et rapide avec bonus a attraper.";
+      renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
       overlay.classList.add("hidden");
       startBtn.textContent = "Jouer";
       resetGame();
@@ -1548,6 +1689,7 @@
       window.visualViewport.addEventListener("resize", resizeGame);
     }
     resetGame();
+    renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
     state.running = false;
     requestAnimationFrame(frame);
   </script>
