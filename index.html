@@ -882,8 +882,8 @@
 
       if (state.inputMode === "touch") {
         targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
-        smoothing = 0.24;
-        maxStep = 18;
+        smoothing = 0.4;
+        maxStep = 28;
       }
 
       const delta = (targetX - state.paddle.x) * smoothing;
@@ -1386,7 +1386,7 @@
     function updateTouchTarget(event, isStart = false) {
       const rect = canvas.getBoundingClientRect();
       const ratio = width / rect.width;
-      const deadZone = 5 * ratio;
+      const deadZone = 2 * ratio;
 
       if (isStart) {
         state.touchState.active = true;
@@ -1403,7 +1403,7 @@
       const adjustedDelta = Math.abs(deltaX) <= deadZone
         ? 0
         : deltaX - Math.sign(deltaX) * deadZone;
-      state.touchState.targetX = state.touchState.anchorPaddleX + adjustedDelta * 0.97;
+      state.touchState.targetX = state.touchState.anchorPaddleX + adjustedDelta * 1.04;
       state.touchState.targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
       state.pointerX = state.touchState.targetX + state.paddle.width / 2;
     }
