@@ -118,18 +118,53 @@
       color: rgba(244, 247, 255, 0.84);
     }
 
+    #lives {
+      color: #ff9bbb;
+      text-shadow: 0 0 10px rgba(255, 107, 138, 0.28);
+    }
+
+    #score {
+      color: #ffe28f;
+    }
+
+    #level {
+      color: #9de7ff;
+    }
+
     .hint {
       align-self: center;
-      max-width: 250px;
+      max-width: 280px;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(8, 16, 35, 0.26);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      color: rgba(237, 244, 255, 0.8);
+      background: rgba(8, 16, 35, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      color: rgba(237, 244, 255, 0.88);
       font-size: 0.72rem;
       letter-spacing: 0.02em;
       text-align: center;
       backdrop-filter: blur(6px);
+    }
+
+    .bonusrack {
+      align-self: center;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      max-width: min(92%, 320px);
+      min-height: 24px;
+    }
+
+    .bonuschip {
+      padding: 4px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.03em;
+      color: rgba(255, 255, 255, 0.96);
+      box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      white-space: nowrap;
     }
 
     .micro {
@@ -160,6 +195,14 @@
       text-overflow: ellipsis;
       white-space: nowrap;
       color: rgba(244, 247, 255, 0.72);
+    }
+
+    #balls {
+      color: #ffe28f;
+    }
+
+    #effect {
+      color: #9de7ff;
     }
 
     .overlay {
@@ -253,6 +296,7 @@
       </div>
 
       <div class="hint hidden" id="status">Glisse ton doigt ou la souris pour bouger la raquette</div>
+      <div class="bonusrack hidden" id="bonusRack"></div>
 
     </div>
 
@@ -290,6 +334,7 @@
     const ballsEl = document.getElementById("balls");
     const effectEl = document.getElementById("effect");
     const statusEl = document.getElementById("status");
+    const bonusRackEl = document.getElementById("bonusRack");
     const overlay = document.getElementById("overlay");
     const startBtn = document.getElementById("startBtn");
 
@@ -313,6 +358,19 @@
       magnet: { color: "#7affd8", label: "Aimant", icon: "A" },
       missile: { color: "#ff5252", label: "Missiles", icon: "T" }
     };
+
+    const levelFlavors = [
+      "On commence doucement",
+      "Ca chauffe un peu",
+      "Le jeu te regarde en souriant",
+      "Tes doigts vont devoir se reveiller",
+      "Ca devient serieusement nerveux",
+      "Le poisson du debut te manque deja",
+      "Mode arcade, plus d'excuses",
+      "Le jeu a decide de te tester",
+      "La, on parle entre vrais pilotes",
+      "Bienvenue dans la zone rouge"
+    ];
 
     const animalLevels = [
       { name: "Poisson", mask: [
@@ -492,11 +550,12 @@
     }
 
     function getLevelConfig(level) {
+      const bonusChance = Math.max(0.04, 0.24 - (level - 1) * 0.017);
       return {
         speedScale: 1 + Math.min(0.55, (level - 1) * 0.038),
         hpBoost: 0,
         paddleWidth: Math.max(88, 124 - Math.floor((level - 1) / 2) * 5),
-        bonusChance: Math.max(0.08, 0.15 - (level - 1) * 0.006),
+        bonusChance,
         missileRate: Math.max(220, 340 - (level - 1) * 8)
       };
     }
@@ -533,10 +592,11 @@
 
     function updateHud() {
       scoreEl.textContent = state.score;
-      livesEl.textContent = state.lives;
+      livesEl.textContent = state.lives + " vies";
       levelEl.textContent = state.level;
       ballsEl.textContent = state.balls.length;
       effectEl.textContent = getEffectLabel();
+      renderActiveBonuses();
     }
 
     function lockBallToPaddle(ball) {
@@ -562,15 +622,44 @@
     }
 
     function getEffectLabel() {
+      const active = getActiveBonuses();
+      if (active.length === 0) return "Aucun";
+      if (active.length === 1) return active[0].short;
+      return active.length + " actifs";
+    }
+
+    function getActiveBonuses() {
       const now = performance.now();
-      const labels = [];
-      if (state.effects.wideUntil > now) labels.push("Raquette +");
-      if (state.effects.slowUntil > now) labels.push("Lent");
-      if (state.effects.fireUntil > now) labels.push("Feu");
-      if (state.effects.shieldUntil > now) labels.push("Bouclier");
-      if (state.effects.magnetUntil > now) labels.push("Aimant");
-      if (state.effects.missileUntil > now) labels.push("Missiles");
-      return labels.length ? labels.join(" / ") : "Aucun";
+      const active = [];
+      if (state.effects.wideUntil > now) active.push({ short: "Large", label: "Raquette +", color: bonusTypes.wide.color });
+      if (state.effects.slowUntil > now) active.push({ short: "Slow", label: "Balle lente", color: bonusTypes.slow.color });
+      if (state.effects.fireUntil > now) active.push({ short: "Feu", label: "Balle de feu", color: bonusTypes.fire.color });
+      if (state.effects.shieldUntil > now) active.push({ short: "Shield", label: "Bouclier", color: bonusTypes.shield.color });
+      if (state.effects.magnetUntil > now) active.push({ short: "Aimant", label: "Aimant", color: bonusTypes.magnet.color });
+      if (state.effects.missileUntil > now) active.push({ short: "Missiles", label: "Missiles", color: bonusTypes.missile.color });
+      return active;
+    }
+
+    function renderActiveBonuses() {
+      const active = getActiveBonuses();
+      if (active.length === 0) {
+        bonusRackEl.innerHTML = "";
+        bonusRackEl.classList.add("hidden");
+        return;
+      }
+
+      bonusRackEl.classList.remove("hidden");
+      bonusRackEl.innerHTML = active.map((bonus) =>
+        '<span class="bonuschip" style="background:' + bonus.color + '26;border-color:' + bonus.color + '66;color:#ffffff">' + bonus.label + "</span>"
+      ).join("");
+    }
+
+    function getLevelFlavor(level) {
+      return levelFlavors[(level - 1) % levelFlavors.length];
+    }
+
+    function getLevelIntro(level) {
+      return "Niveau " + level + " - " + getLevelFlavor(level);
     }
 
     function spawnBonus(x, y) {
@@ -900,7 +989,7 @@
           lockBallToPaddle(state.balls[0]);
         }
         statusEl.classList.remove("hidden");
-        statusEl.textContent = "Niveau " + state.level + " - touchez ou Espace";
+        statusEl.textContent = getLevelIntro(state.level);
         state.levelLabelUntil = now + 1800;
         playSound("level");
       }
@@ -1225,6 +1314,9 @@
       ctx.fillStyle = "rgba(255,216,77,0.86)";
       ctx.font = "bold 24px Trebuchet MS";
       ctx.fillText(tierText, width / 2, height / 2 + 26);
+      ctx.fillStyle = "rgba(214, 233, 255, 0.9)";
+      ctx.font = "bold 16px Trebuchet MS";
+      ctx.fillText(getLevelFlavor(state.level), width / 2, height / 2 + 56);
       ctx.restore();
     }
 
