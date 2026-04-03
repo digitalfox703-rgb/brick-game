@@ -901,9 +901,24 @@
       if (state.ballLocked) return;
       const slowFactor = state.effects.slowUntil > now ? 0.78 : 1;
       const levelSpeed = state.levelConfig.speedScale;
+      const shieldActive = state.effects.shieldUntil > now;
 
       for (let i = state.balls.length - 1; i >= 0; i -= 1) {
         const ball = state.balls[i];
+        if (state.effects.magnetUntil > now) {
+          const targetX = state.paddle.x + state.paddle.width / 2;
+          const targetY = state.paddle.y - 8;
+          ball.vx += (targetX - ball.x) * 0.0032;
+          ball.vy += (targetY - ball.y) * 0.0014;
+          const maxMagnetSpeed = 8.6;
+          const magnetSpeed = Math.hypot(ball.vx, ball.vy);
+          if (magnetSpeed > maxMagnetSpeed) {
+            const scale = maxMagnetSpeed / magnetSpeed;
+            ball.vx *= scale;
+            ball.vy *= scale;
+          }
+        }
+
         ball.x += ball.vx * slowFactor * levelSpeed;
         ball.y += ball.vy * slowFactor * levelSpeed;
         ball.trail.push({ x: ball.x, y: ball.y });
@@ -922,14 +937,22 @@
         }
 
         const paddle = state.paddle;
+        const defenseX = shieldActive ? 0 : paddle.x;
+        const defenseWidth = shieldActive ? width : paddle.width;
         if (
           ball.y + ball.radius >= paddle.y &&
-          ball.y - ball.radius <= paddle.y + paddle.height &&
-          ball.x >= paddle.x &&
-          ball.x <= paddle.x + paddle.width &&
+          ball.y - ball.radius <= paddle.y + paddle.height + (shieldActive ? 6 : 0) &&
+          ball.x >= defenseX &&
+          ball.x <= defenseX + defenseWidth &&
           ball.vy > 0
         ) {
-          const hit = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+          let hit;
+          if (shieldActive && (ball.x < paddle.x || ball.x > paddle.x + paddle.width)) {
+            hit = ((ball.x / width) - 0.5) * 1.4;
+          } else {
+            hit = (ball.x - (paddle.x + paddle.width / 2)) / (paddle.width / 2);
+          }
+          hit = Math.max(-1, Math.min(1, hit));
           ball.vx = hit * (5.6 + Math.min(1.7, state.level * 0.12));
           ball.vy = -Math.max(5.8, 6.9 - Math.abs(hit) + Math.min(1.1, state.level * 0.06));
           ball.y = paddle.y - ball.radius - 1;
@@ -995,12 +1018,12 @@
       }
 
       if (state.balls.length === 0) {
-        if (state.effects.shieldUntil > now) {
+        if (shieldActive) {
           state.balls = [createBall(width / 2, height - 110, 4.8, -6.2)];
           state.ballLocked = true;
           lockBallToPaddle(state.balls[0]);
           statusEl.classList.remove("hidden");
-        statusEl.textContent = "Bouclier actif. Cette fois, le jeu a rate son coup.";
+          statusEl.textContent = "Bouclier actif. Cette fois, le jeu a rate son coup.";
         } else {
           state.lives -= 1;
           playSound("lifeLost");
@@ -1166,6 +1189,23 @@
       const y = Math.round(p.y);
       const w = Math.round(p.width);
       const h = Math.round(p.height);
+      const shieldActive = state.effects.shieldUntil > performance.now();
+
+      if (shieldActive) {
+        const pulse = 0.6 + Math.sin(performance.now() * 0.01) * 0.16;
+        const shield = ctx.createLinearGradient(0, y - 6, 0, y + h + 8);
+        shield.addColorStop(0, "rgba(210, 157, 255, 0)");
+        shield.addColorStop(0.35, "rgba(179, 136, 255, " + (0.18 + pulse * 0.12) + ")");
+        shield.addColorStop(1, "rgba(179, 136, 255, 0.04)");
+        ctx.fillStyle = shield;
+        roundRect(ctx, 0, y - 6, width, h + 14, 14);
+        ctx.fill();
+
+        ctx.fillStyle = "rgba(233, 213, 255, 0.5)";
+        roundRect(ctx, 0, y - 2, width, 4, 3);
+        ctx.fill();
+      }
+
       ctx.fillStyle = "rgba(2, 8, 22, 0.32)";
       roundRect(ctx, x, y + 5, w, h, 12);
       ctx.fill();
