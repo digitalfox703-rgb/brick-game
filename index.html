@@ -51,12 +51,14 @@
       height: min(100vh - 24px, 900px);
       border-radius: 28px;
       overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 20px 70px rgba(0, 0, 0, 0.38);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.42),
+        0 8px 24px rgba(0, 0, 0, 0.18);
       background:
-        linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)),
-        radial-gradient(circle at center top, rgba(255, 255, 255, 0.08), transparent 40%);
-      backdrop-filter: blur(12px);
+        linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01)),
+        radial-gradient(circle at 50% -10%, rgba(255, 255, 255, 0.12), transparent 38%);
+      backdrop-filter: blur(10px);
     }
 
     canvas {
@@ -173,9 +175,12 @@
       width: min(100%, 360px);
       padding: 26px 24px;
       border-radius: 24px;
-      background: rgba(8, 15, 34, 0.86);
-      border: 1px solid rgba(255, 255, 255, 0.14);
-      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.35);
+      background:
+        linear-gradient(180deg, rgba(17, 27, 53, 0.96), rgba(7, 13, 28, 0.94));
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow:
+        0 18px 48px rgba(0, 0, 0, 0.4),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
       text-align: center;
     }
 
@@ -943,58 +948,136 @@
     }
 
     function drawBackground() {
+      const t = performance.now() * 0.001;
       const grad = ctx.createLinearGradient(0, 0, 0, height);
       grad.addColorStop(0, "#0a1430");
-      grad.addColorStop(0.45, "#132b56");
-      grad.addColorStop(1, "#37126c");
+      grad.addColorStop(0.42, "#11264c");
+      grad.addColorStop(1, "#240f4d");
       ctx.fillStyle = grad;
       ctx.fillRect(0, 0, width, height);
 
-      for (let i = 0; i < 18; i += 1) {
-        ctx.fillStyle = "rgba(255,255,255,0.05)";
+      const glowLeft = ctx.createRadialGradient(width * 0.18, height * 0.14, 10, width * 0.18, height * 0.14, width * 0.48);
+      glowLeft.addColorStop(0, "rgba(76, 228, 255, 0.2)");
+      glowLeft.addColorStop(1, "rgba(76, 228, 255, 0)");
+      ctx.fillStyle = glowLeft;
+      ctx.fillRect(0, 0, width, height);
+
+      const glowRight = ctx.createRadialGradient(width * 0.82, height * 0.12, 10, width * 0.82, height * 0.12, width * 0.45);
+      glowRight.addColorStop(0, "rgba(255, 101, 166, 0.16)");
+      glowRight.addColorStop(1, "rgba(255, 101, 166, 0)");
+      ctx.fillStyle = glowRight;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = "rgba(255,255,255,0.035)";
+      ctx.lineWidth = 1;
+      for (let y = 108; y < height; y += 48) {
         ctx.beginPath();
-        ctx.arc((i * 73) % width, (i * 131) % height, 2 + (i % 4), 0, Math.PI * 2);
+        ctx.moveTo(0, y + 0.5);
+        ctx.lineTo(width, y + 0.5);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 24; i += 1) {
+        const alpha = 0.03 + (i % 4) * 0.01;
+        ctx.fillStyle = "rgba(255,255,255," + alpha + ")";
+        ctx.beginPath();
+        ctx.arc(((i * 73) + t * (8 + i)) % width, (i * 131) % height, 1.4 + (i % 3), 0, Math.PI * 2);
         ctx.fill();
       }
+
+      const vignette = ctx.createLinearGradient(0, 0, 0, height);
+      vignette.addColorStop(0, "rgba(3, 7, 17, 0)");
+      vignette.addColorStop(0.68, "rgba(3, 7, 17, 0.04)");
+      vignette.addColorStop(1, "rgba(2, 5, 14, 0.26)");
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, width, height);
     }
 
     function drawBricks() {
       state.bricks.forEach((brick) => {
-        const shimmer = (performance.now() / 14 + brick.x * 0.35 + brick.y * 0.25) % 360;
-        const pulse = 0.92 + Math.sin((performance.now() / 180) + brick.x * 0.02 + brick.y * 0.01) * 0.05;
-        const baseColor = "hsl(" + ((brick.hue + shimmer * 0.08) % 360) + " 92% 56%)";
-        ctx.save();
-        ctx.translate(brick.x + brick.width / 2, brick.y + brick.height / 2);
-        ctx.scale(pulse, pulse);
-        ctx.shadowColor = baseColor;
-        ctx.shadowBlur = 12;
-        ctx.fillStyle = baseColor;
-        roundRect(ctx, -brick.width / 2, -brick.height / 2, brick.width, brick.height, 9);
+        const t = performance.now() * 0.001;
+        const shimmer = (t * 90 + brick.x * 0.34 + brick.y * 0.21) % 1;
+        const x = Math.round(brick.x);
+        const y = Math.round(brick.y);
+        const w = Math.round(brick.width);
+        const h = Math.round(brick.height);
+        const baseHue = (brick.hue + Math.sin(t + brick.x * 0.01) * 8 + 360) % 360;
+        const shell = ctx.createLinearGradient(x, y, x, y + h);
+        shell.addColorStop(0, "hsla(" + baseHue + ", 92%, 63%, 1)");
+        shell.addColorStop(0.52, "hsla(" + ((baseHue + 10) % 360) + ", 90%, 52%, 1)");
+        shell.addColorStop(1, "hsla(" + ((baseHue + 22) % 360) + ", 88%, 38%, 1)");
+
+        ctx.fillStyle = "rgba(5, 10, 24, 0.26)";
+        roundRect(ctx, x, y + 4, w, h, 8);
         ctx.fill();
 
-        const gloss = ctx.createLinearGradient(-brick.width / 2, -brick.height / 2, brick.width / 2, brick.height / 2);
-        gloss.addColorStop(0, "rgba(255,255,255,0.7)");
-        gloss.addColorStop(0.35, "rgba(255,255,255,0.18)");
-        gloss.addColorStop(1, "rgba(255,255,255,0.04)");
-        ctx.fillStyle = gloss;
-        roundRect(ctx, -brick.width / 2 + 2, -brick.height / 2 + 2, brick.width - 4, brick.height - 4, 7);
+        ctx.fillStyle = shell;
+        roundRect(ctx, x, y, w, h, 8);
         ctx.fill();
+
+        const inner = ctx.createLinearGradient(x, y + 2, x, y + h - 2);
+        inner.addColorStop(0, "rgba(255,255,255,0.2)");
+        inner.addColorStop(0.22, "rgba(255,255,255,0.08)");
+        inner.addColorStop(1, "rgba(0,0,0,0.16)");
+        ctx.fillStyle = inner;
+        roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 6);
+        ctx.fill();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.18)";
+        ctx.lineWidth = 1;
+        roundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 8);
+        ctx.stroke();
+
+        ctx.fillStyle = "rgba(255,255,255,0.32)";
+        roundRect(ctx, x + 4, y + 4, Math.max(14, w * 0.4), 3, 3);
+        ctx.fill();
+
+        const sweepX = x - w * 0.2 + (w * 1.4 * shimmer);
+        const sweep = ctx.createLinearGradient(sweepX - 12, y, sweepX + 12, y);
+        sweep.addColorStop(0, "rgba(255,255,255,0)");
+        sweep.addColorStop(0.5, "rgba(255,255,255,0.16)");
+        sweep.addColorStop(1, "rgba(255,255,255,0)");
+        ctx.save();
+        roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 6);
+        ctx.clip();
+        ctx.fillStyle = sweep;
+        ctx.fillRect(x, y, w, h);
         ctx.restore();
       });
     }
 
     function drawPaddle() {
       const p = state.paddle;
-      const gradient = ctx.createLinearGradient(p.x, p.y, p.x + p.width, p.y + p.height);
-      gradient.addColorStop(0, "#46e1ff");
-      gradient.addColorStop(0.5, "#b2fffe");
-      gradient.addColorStop(1, "#7c6dff");
-      ctx.fillStyle = gradient;
-      roundRect(ctx, p.x, p.y, p.width, p.height, 14);
+      const x = Math.round(p.x);
+      const y = Math.round(p.y);
+      const w = Math.round(p.width);
+      const h = Math.round(p.height);
+      ctx.fillStyle = "rgba(2, 8, 22, 0.32)";
+      roundRect(ctx, x, y + 5, w, h, 12);
       ctx.fill();
 
-      ctx.fillStyle = "rgba(255,255,255,0.32)";
-      roundRect(ctx, p.x + 8, p.y + 3, p.width - 16, 5, 8);
+      const shell = ctx.createLinearGradient(x, y, x + w, y + h);
+      shell.addColorStop(0, "#2de0ff");
+      shell.addColorStop(0.52, "#b8fffd");
+      shell.addColorStop(1, "#5f66ff");
+      ctx.fillStyle = shell;
+      roundRect(ctx, x, y, w, h, 12);
+      ctx.fill();
+
+      const core = ctx.createLinearGradient(x, y + 2, x, y + h - 2);
+      core.addColorStop(0, "rgba(255,255,255,0.36)");
+      core.addColorStop(0.4, "rgba(255,255,255,0.1)");
+      core.addColorStop(1, "rgba(10,18,46,0.16)");
+      ctx.fillStyle = core;
+      roundRect(ctx, x + 2, y + 2, w - 4, h - 4, 10);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.52)";
+      roundRect(ctx, x + 10, y + 3, w - 20, 4, 4);
+      ctx.fill();
+
+      ctx.fillStyle = "rgba(255,255,255,0.24)";
+      roundRect(ctx, x + w * 0.28, y + h * 0.38, w * 0.44, 3, 3);
       ctx.fill();
     }
 
