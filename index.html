@@ -361,13 +361,13 @@
 
     const levelFlavors = [
       "On commence doucement",
-      "Ca chauffe un peu",
+      "Ca chauffe un peu, mais on reste polis",
       "Le jeu te regarde en souriant",
       "Tes doigts vont devoir se reveiller",
       "Ca devient serieusement nerveux",
-      "Le poisson du debut te manque deja",
+      "Le niveau tuto te manque deja",
       "Mode arcade, plus d'excuses",
-      "Le jeu a decide de te tester",
+      "Le jeu a decide de te tester pour de vrai",
       "La, on parle entre vrais pilotes",
       "Bienvenue dans la zone rouge"
     ];
@@ -532,7 +532,7 @@
       buildLevel();
       updateHud();
       statusEl.classList.remove("hidden");
-      statusEl.textContent = "Touchez l'ecran ou appuyez sur Espace";
+      statusEl.textContent = "Touchez pour lancer. Espace marche aussi si tu veux faire pro.";
       state.levelLabelUntil = performance.now() + 1800;
     }
 
@@ -700,7 +700,7 @@
       } else if (type === "missile") {
         state.effects.missileUntil = now + 12000;
       }
-      statusEl.textContent = "Bonus attrape: " + bonusTypes[type].label;
+      statusEl.textContent = bonusTypes[type].label + " active. Oui, ca sent le comeback.";
       playSound("bonus");
       updateHud();
     }
@@ -882,8 +882,8 @@
 
       if (state.inputMode === "touch") {
         targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
-        smoothing = 0.16;
-        maxStep = 12;
+        smoothing = 0.24;
+        maxStep = 18;
       }
 
       const delta = (targetX - state.paddle.x) * smoothing;
@@ -1000,7 +1000,7 @@
           state.ballLocked = true;
           lockBallToPaddle(state.balls[0]);
           statusEl.classList.remove("hidden");
-          statusEl.textContent = "Bouclier actif - touchez ou Espace";
+        statusEl.textContent = "Bouclier actif. Cette fois, le jeu a rate son coup.";
         } else {
           state.lives -= 1;
           playSound("lifeLost");
@@ -1012,7 +1012,7 @@
           state.ballLocked = true;
           lockBallToPaddle(state.balls[0]);
           statusEl.classList.remove("hidden");
-          statusEl.textContent = "Vie perdue - touchez ou Espace";
+          statusEl.textContent = "Une vie en moins. Respire, on repart propre.";
         }
       }
     }
@@ -1283,9 +1283,9 @@
       state.running = false;
       playSound("gameOver");
       statusEl.classList.remove("hidden");
-      statusEl.textContent = "Clique sur Jouer pour recommencer";
-      document.querySelector(".card h1").textContent = "Partie terminee";
-      document.querySelector(".card p").textContent = "Score final: " + state.score + " points. Clique pour recommencer.";
+      statusEl.textContent = "On remet ca ? Cette fois tu connais le jeu.";
+      document.querySelector(".card h1").textContent = "Fin de run";
+      document.querySelector(".card p").textContent = "Score final: " + state.score + " points. Franchement, on peut faire encore plus sale au prochain essai.";
       overlay.classList.remove("hidden");
       startBtn.textContent = "Rejouer";
       updateHud();
@@ -1346,7 +1346,7 @@
     function updateTouchTarget(event, isStart = false) {
       const rect = canvas.getBoundingClientRect();
       const ratio = width / rect.width;
-      const deadZone = 10 * ratio;
+      const deadZone = 5 * ratio;
 
       if (isStart) {
         state.touchState.active = true;
@@ -1363,7 +1363,7 @@
       const adjustedDelta = Math.abs(deltaX) <= deadZone
         ? 0
         : deltaX - Math.sign(deltaX) * deadZone;
-      state.touchState.targetX = state.touchState.anchorPaddleX + adjustedDelta * 0.88;
+      state.touchState.targetX = state.touchState.anchorPaddleX + adjustedDelta * 0.97;
       state.touchState.targetX = Math.max(0, Math.min(width - state.paddle.width, state.touchState.targetX));
       state.pointerX = state.touchState.targetX + state.paddle.width / 2;
     }
