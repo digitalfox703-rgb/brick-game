@@ -94,6 +94,70 @@
       pointer-events: none;
     }
 
+    .ingame-board {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      width: min(148px, 34vw);
+      padding: 8px 9px;
+      border-radius: 16px;
+      background: rgba(8, 16, 35, 0.26);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+    }
+
+    .ingame-board h3 {
+      margin: 0 0 6px;
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: rgba(255, 226, 143, 0.92);
+    }
+
+    .ingame-board-list {
+      display: grid;
+      gap: 4px;
+    }
+
+    .ingame-board-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 6px;
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.04);
+      color: rgba(244, 247, 255, 0.9);
+      font-size: 0.68rem;
+    }
+
+    .ingame-board-rank {
+      color: #ffe28f;
+      font-weight: 700;
+      min-width: 18px;
+    }
+
+    .ingame-board-name {
+      flex: 1 1 auto;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .ingame-board-score {
+      color: #8fdcff;
+      font-weight: 700;
+      font-size: 0.66rem;
+    }
+
+    .ingame-board p {
+      margin: 0;
+      color: rgba(207, 224, 255, 0.78);
+      font-size: 0.68rem;
+      line-height: 1.25;
+    }
+
     .pill {
       min-width: 0;
       flex: 0 0 auto;
@@ -365,6 +429,8 @@
       <div class="micro"><span class="icon">*</span><strong id="effect">Aucun</strong></div>
     </div>
 
+    <div class="ingame-board" id="ingameBoard"></div>
+
     <div class="overlay" id="overlay">
       <div class="card">
         <h1>Brick Color Splash</h1>
@@ -398,6 +464,7 @@
     const statusEl = document.getElementById("status");
     const bonusRackEl = document.getElementById("bonusRack");
     const overlay = document.getElementById("overlay");
+    const ingameBoardEl = document.getElementById("ingameBoard");
     const leaderboardEl = document.getElementById("leaderboard");
     const cardTitleEl = document.querySelector(".card h1");
     const cardTextEl = document.querySelector(".card p");
@@ -653,11 +720,16 @@
       }
     }
 
+    function getVisibleLeaderboardEntries() {
+      return loadLeaderboard().filter((entry) => entry.score > 7500).slice(0, 3);
+    }
+
     function renderLeaderboard(message) {
-      const visibleEntries = loadLeaderboard().filter((entry) => entry.score > 7500).slice(0, 3);
+      const visibleEntries = getVisibleLeaderboardEntries();
       if (visibleEntries.length === 0) {
         leaderboardEl.innerHTML =
           "<h2>Top 3</h2><p>" + (message || "Passe 7500 pour entrer dans le tableau.") + "</p>";
+        renderInGameLeaderboard();
         return;
       }
 
@@ -669,6 +741,25 @@
           '<div class="leaderboard-item"><span class="leaderboard-rank">#' + (index + 1) +
           '</span><span class="leaderboard-name">' + entry.name +
           '</span><span class="leaderboard-score">' + entry.score + "</span></div>"
+        ).join("") +
+        "</div>";
+      renderInGameLeaderboard();
+    }
+
+    function renderInGameLeaderboard() {
+      const visibleEntries = getVisibleLeaderboardEntries();
+      if (visibleEntries.length === 0) {
+        ingameBoardEl.innerHTML = "<h3>Top 3</h3><p>7500+ pour entrer</p>";
+        return;
+      }
+
+      ingameBoardEl.innerHTML =
+        "<h3>Top 3</h3>" +
+        '<div class="ingame-board-list">' +
+        visibleEntries.map((entry, index) =>
+          '<div class="ingame-board-item"><span class="ingame-board-rank">#' + (index + 1) +
+          '</span><span class="ingame-board-name">' + entry.name +
+          '</span><span class="ingame-board-score">' + entry.score + "</span></div>"
         ).join("") +
         "</div>";
     }
