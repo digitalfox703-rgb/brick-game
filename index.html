@@ -503,6 +503,10 @@
     };
 
     const LEADERBOARD_KEY = "brick-color-splash-top3";
+    const LEADERBOARD_API = "/api/leaderboard";
+    const LEADERBOARD_MAX = 3;
+    const LEADERBOARD_PROMPT_MIN = 7000;
+    const LEADERBOARD_DISPLAY_MIN = 7500;
 
     const levelFlavors = [
       "On commence doucement",
@@ -640,6 +644,8 @@
         speed: 0.22,
         keyboardSpeed: 8.5
       },
+      leaderboardEntries: [],
+      leaderboardSource: "local",
       levelLabelUntil: 0,
       lastMissileShot: 0
     };
@@ -695,7 +701,7 @@
       };
     }
 
-    function loadLeaderboard() {
+    function loadLeaderboardCache() {
       try {
         const raw = localStorage.getItem(LEADERBOARD_KEY);
         const parsed = raw ? JSON.parse(raw) : [];
@@ -713,15 +719,45 @@
       }
     }
 
-    function saveLeaderboard(entries) {
+    function saveLeaderboardCache(entries) {
       try {
-        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, 3)));
+        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, LEADERBOARD_MAX)));
       } catch (error) {
       }
     }
 
+    async function fetchLeaderboardFromApi() {
+      const response = await fetch(LEADERBOARD_API, {
+        method: "GET",
+        headers: {
+          "Accept": "application/json"
+        }
+      });
+      if (!response.ok) {
+        throw new Error("leaderboard_fetch_failed");
+      }
+      const data = await response.json();
+      return Array.isArray(data.entries) ? data.entries : [];
+    }
+
+    async function refreshLeaderboard(message) {
+      try {
+        const entries = await fetchLeaderboardFromApi();
+        state.leaderboardEntries = entries;
+        state.leaderboardSource = "remote";
+        saveLeaderboardCache(entries);
+      } catch (error) {
+        state.leaderboardEntries = loadLeaderboardCache();
+        state.leaderboardSource = "local";
+      }
+
+      renderLeaderboard(message);
+    }
+
     function getVisibleLeaderboardEntries() {
-      return loadLeaderboard().filter((entry) => entry.score > 7500).slice(0, 3);
+      return state.leaderboardEntries
+        .filter((entry) => entry.score > LEADERBOARD_DISPLAY_MIN)
+        .slice(0, LEADERBOARD_MAX);
     }
 
     function renderLeaderboard(message) {
@@ -764,10 +800,27 @@
         "</div>";
     }
 
-    function maybeSaveLeaderboardScore(score) {
-      const leaderboard = loadLeaderboard();
-      if (score <= 7000) return { added: false, board: leaderboard };
-      if (leaderboard.length >= 3 && score <= leaderboard[leaderboard.length - 1].score) {
+    async function submitLeaderboardScore(name, score) {
+      const response = await fetch(LEADERBOARD_API, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
+        body: JSON.stringify({ name, score })
+      });
+
+      if (!response.ok) {
+        throw new Error("leaderboard_submit_failed");
+      }
+
+      return response.json();
+    }
+
+    async function maybeSaveLeaderboardScore(score) {
+      const leaderboard = state.leaderboardEntries.length ? state.leaderboardEntries : loadLeaderboardCache();
+      if (score <= LEADERBOARD_PROMPT_MIN) return { added: false, board: leaderboard };
+      if (leaderboard.length >= LEADERBOARD_MAX && score <= leaderboard[leaderboard.length - 1].score) {
         return { added: false, board: leaderboard };
       }
 
@@ -777,13 +830,23 @@
         return { added: false, board: leaderboard, skipped: true };
       }
 
-      const nextBoard = leaderboard
-        .concat({ name: cleanName, score: Math.round(score) })
-        .sort((a, b) => b.score - a.score)
-        .slice(0, 3);
-
-      saveLeaderboard(nextBoard);
-      return { added: true, board: nextBoard, name: cleanName };
+      try {
+        const result = await submitLeaderboardScore(cleanName, score);
+        const nextBoard = Array.isArray(result.entries) ? result.entries : leaderboard;
+        state.leaderboardEntries = nextBoard;
+        state.leaderboardSource = "remote";
+        saveLeaderboardCache(nextBoard);
+        return { added: !!result.added, board: nextBoard, name: cleanName, remote: true };
+      } catch (error) {
+        const nextBoard = leaderboard
+          .concat({ name: cleanName, score: Math.round(score) })
+          .sort((a, b) => b.score - a.score)
+          .slice(0, LEADERBOARD_MAX);
+        state.leaderboardEntries = nextBoard;
+        state.leaderboardSource = "local";
+        saveLeaderboardCache(nextBoard);
+        return { added: true, board: nextBoard, name: cleanName, remote: false };
+      }
     }
 
     function getLevelConfig(level) {
@@ -1564,21 +1627,23 @@
     function endGame() {
       state.running = false;
       playSound("gameOver");
-      const leaderboardResult = maybeSaveLeaderboardScore(state.score);
       statusEl.classList.remove("hidden");
       statusEl.textContent = "On remet ca ? Cette fois tu connais le jeu.";
       cardTitleEl.textContent = "Fin de run";
       cardTextEl.textContent = "Score final: " + state.score + " points. On peut encore faire mieux au prochain essai.";
-      if (leaderboardResult.added) {
-        renderLeaderboard(leaderboardResult.name + " entre dans le Top 3.");
-      } else if (state.score > 7000) {
-        renderLeaderboard("Beau score. Il fallait un peu plus pour rentrer dans le Top 3.");
-      } else {
-        renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
-      }
       overlay.classList.remove("hidden");
       startBtn.textContent = "Rejouer";
       updateHud();
+
+      maybeSaveLeaderboardScore(state.score).then((leaderboardResult) => {
+        if (leaderboardResult.added) {
+          renderLeaderboard(leaderboardResult.name + " entre dans le Top 3.");
+        } else if (state.score > LEADERBOARD_PROMPT_MIN) {
+          renderLeaderboard("Beau score. Il fallait un peu plus pour rentrer dans le Top 3.");
+        } else {
+          renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
+        }
+      });
     }
 
     function render() {
@@ -1768,19 +1833,20 @@
       ensureAudio();
       cardTitleEl.textContent = "Brick Color Splash";
       cardTextEl.textContent = "Un casse-briques vertical, vif et rapide avec bonus a attraper.";
-      renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
+      refreshLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
       overlay.classList.add("hidden");
       startBtn.textContent = "Jouer";
       resetGame();
     });
 
+    state.leaderboardEntries = loadLeaderboardCache();
     resizeGame();
     window.addEventListener("resize", resizeGame);
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", resizeGame);
     }
     resetGame();
-    renderLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
+    refreshLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
     state.running = false;
     requestAnimationFrame(frame);
   </script>

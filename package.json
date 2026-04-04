@@ -1,0 +1,7 @@
+{
+  "name": "brick-color-splash",
+  "private": true,
+  "dependencies": {
+    "@vercel/kv": "^1.0.1"
+  }
+}
