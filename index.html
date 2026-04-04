@@ -502,7 +502,6 @@
       missile: { color: "#ff5252", label: "Missiles", icon: "T" }
     };
 
-    const LEADERBOARD_KEY = "brick-color-splash-top3";
     const LEADERBOARD_API = "/api/leaderboard";
     const LEADERBOARD_MAX = 3;
     const LEADERBOARD_PROMPT_MIN = 7000;
@@ -645,7 +644,6 @@
         keyboardSpeed: 8.5
       },
       leaderboardEntries: [],
-      leaderboardSource: "local",
       levelLabelUntil: 0,
       lastMissileShot: 0
     };
@@ -701,31 +699,6 @@
       };
     }
 
-    function loadLeaderboardCache() {
-      try {
-        const raw = localStorage.getItem(LEADERBOARD_KEY);
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (!Array.isArray(parsed)) return [];
-        return parsed
-          .filter((entry) => entry && typeof entry.name === "string" && Number.isFinite(entry.score))
-          .map((entry) => ({
-            name: entry.name.trim().slice(0, 18) || "Joueur",
-            score: Math.round(entry.score)
-          }))
-          .sort((a, b) => b.score - a.score)
-          .slice(0, 3);
-      } catch (error) {
-        return [];
-      }
-    }
-
-    function saveLeaderboardCache(entries) {
-      try {
-        localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(entries.slice(0, LEADERBOARD_MAX)));
-      } catch (error) {
-      }
-    }
-
     async function fetchLeaderboardFromApi() {
       const response = await fetch(LEADERBOARD_API, {
         method: "GET",
@@ -744,11 +717,8 @@
       try {
         const entries = await fetchLeaderboardFromApi();
         state.leaderboardEntries = entries;
-        state.leaderboardSource = "remote";
-        saveLeaderboardCache(entries);
       } catch (error) {
-        state.leaderboardEntries = loadLeaderboardCache();
-        state.leaderboardSource = "local";
+        state.leaderboardEntries = [];
       }
 
       renderLeaderboard(message);
@@ -818,7 +788,7 @@
     }
 
     async function maybeSaveLeaderboardScore(score) {
-      const leaderboard = state.leaderboardEntries.length ? state.leaderboardEntries : loadLeaderboardCache();
+      const leaderboard = state.leaderboardEntries;
       if (score <= LEADERBOARD_PROMPT_MIN) return { added: false, board: leaderboard };
       if (leaderboard.length >= LEADERBOARD_MAX && score <= leaderboard[leaderboard.length - 1].score) {
         return { added: false, board: leaderboard };
@@ -834,18 +804,10 @@
         const result = await submitLeaderboardScore(cleanName, score);
         const nextBoard = Array.isArray(result.entries) ? result.entries : leaderboard;
         state.leaderboardEntries = nextBoard;
-        state.leaderboardSource = "remote";
-        saveLeaderboardCache(nextBoard);
         return { added: !!result.added, board: nextBoard, name: cleanName, remote: true };
       } catch (error) {
-        const nextBoard = leaderboard
-          .concat({ name: cleanName, score: Math.round(score) })
-          .sort((a, b) => b.score - a.score)
-          .slice(0, LEADERBOARD_MAX);
-        state.leaderboardEntries = nextBoard;
-        state.leaderboardSource = "local";
-        saveLeaderboardCache(nextBoard);
-        return { added: true, board: nextBoard, name: cleanName, remote: false };
+        state.leaderboardEntries = leaderboard;
+        return { added: false, board: leaderboard, name: cleanName, remote: false };
       }
     }
 
@@ -1839,7 +1801,6 @@
       resetGame();
     });
 
-    state.leaderboardEntries = loadLeaderboardCache();
     resizeGame();
     window.addEventListener("resize", resizeGame);
     if (window.visualViewport) {
