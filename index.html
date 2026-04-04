@@ -305,6 +305,62 @@
       text-align: center;
     }
 
+    .prompt-card {
+      width: min(100%, 320px);
+      margin-top: 14px;
+      padding: 18px 18px 16px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      text-align: left;
+    }
+
+    .prompt-card h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+      color: #fff2b4;
+    }
+
+    .prompt-card p {
+      margin: 0 0 12px;
+      font-size: 0.92rem;
+      color: #dbe6ff;
+      line-height: 1.4;
+    }
+
+    .prompt-card input {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(7, 13, 28, 0.8);
+      color: #f7fbff;
+      font: inherit;
+      outline: none;
+    }
+
+    .prompt-card input:focus {
+      border-color: rgba(255, 216, 77, 0.52);
+      box-shadow: 0 0 0 3px rgba(255, 216, 77, 0.12);
+    }
+
+    .prompt-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .prompt-actions button {
+      flex: 1 1 auto;
+    }
+
+    .ghost-btn {
+      color: #eef5ff;
+      background: rgba(255, 255, 255, 0.08);
+      box-shadow: none;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
     .card h1 {
       margin: 0 0 12px;
       font-size: 2rem;
@@ -460,6 +516,15 @@
         <p>Casse les briques, attrape les bonus et joue au doigt, a la souris ou avec les fleches du clavier.</p>
         <div class="leaderboard" id="leaderboard"></div>
         <button id="startBtn">Jouer</button>
+        <div class="prompt-card hidden" id="namePrompt">
+          <h2>Bravo, tu vas entrer dans le classement</h2>
+          <p>Entre ton prenom pour apparaitre dans le Top 3.</p>
+          <input id="nameInput" type="text" maxlength="18" placeholder="Ton prenom" autocomplete="given-name">
+          <div class="prompt-actions">
+            <button class="ghost-btn" id="nameCancelBtn" type="button">Plus tard</button>
+            <button id="nameSaveBtn" type="button">Valider</button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -482,6 +547,10 @@
     const cardTitleEl = document.querySelector(".card h1");
     const cardTextEl = document.querySelector(".card p");
     const startBtn = document.getElementById("startBtn");
+    const namePromptEl = document.getElementById("namePrompt");
+    const nameInputEl = document.getElementById("nameInput");
+    const nameCancelBtn = document.getElementById("nameCancelBtn");
+    const nameSaveBtn = document.getElementById("nameSaveBtn");
 
     let width = canvas.width;
     let height = canvas.height;
@@ -802,6 +871,51 @@
       return response.json();
     }
 
+    function askLeaderboardName() {
+      return new Promise((resolve) => {
+        namePromptEl.classList.remove("hidden");
+        nameInputEl.value = "";
+
+        const cleanup = () => {
+          namePromptEl.classList.add("hidden");
+          nameSaveBtn.removeEventListener("click", handleSave);
+          nameCancelBtn.removeEventListener("click", handleCancel);
+          nameInputEl.removeEventListener("keydown", handleKeydown);
+        };
+
+        const handleSave = () => {
+          const cleanName = nameInputEl.value.trim().replace(/\s+/g, " ").slice(0, 18);
+          if (!cleanName) {
+            nameInputEl.focus();
+            return;
+          }
+          cleanup();
+          resolve(cleanName);
+        };
+
+        const handleCancel = () => {
+          cleanup();
+          resolve("");
+        };
+
+        const handleKeydown = (event) => {
+          if (event.key === "Enter") {
+            event.preventDefault();
+            handleSave();
+          } else if (event.key === "Escape") {
+            event.preventDefault();
+            handleCancel();
+          }
+        };
+
+        nameSaveBtn.addEventListener("click", handleSave);
+        nameCancelBtn.addEventListener("click", handleCancel);
+        nameInputEl.addEventListener("keydown", handleKeydown);
+
+        setTimeout(() => nameInputEl.focus(), 0);
+      });
+    }
+
     async function maybeSaveLeaderboardScore(score) {
       const leaderboard = state.leaderboardEntries;
       if (score <= LEADERBOARD_PROMPT_MIN) return { added: false, board: leaderboard };
@@ -809,8 +923,7 @@
         return { added: false, board: leaderboard };
       }
 
-      const firstName = window.prompt("Top 3 possible. Ton prenom ?", "") || "";
-      const cleanName = firstName.trim().replace(/\s+/g, " ").slice(0, 18);
+      const cleanName = await askLeaderboardName();
       if (!cleanName) {
         return { added: false, board: leaderboard, skipped: true };
       }
@@ -1815,6 +1928,7 @@
       ensureAudio();
       cardTitleEl.textContent = "Brick Color Splash";
       cardTextEl.textContent = "Un casse-briques vertical, vif et rapide avec bonus a attraper.";
+      namePromptEl.classList.add("hidden");
       refreshLeaderboard("Seuls les scores au-dessus de 7500 s'affichent.");
       overlay.classList.add("hidden");
       startBtn.textContent = "Jouer";
