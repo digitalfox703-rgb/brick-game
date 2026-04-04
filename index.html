@@ -108,6 +108,13 @@
       box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
     }
 
+    .ingame-board.top-entry {
+      border-color: rgba(255, 226, 143, 0.24);
+      box-shadow:
+        0 12px 28px rgba(0, 0, 0, 0.18),
+        0 0 24px rgba(255, 216, 77, 0.08);
+    }
+
     .ingame-board h3 {
       margin: 0 0 6px;
       font-size: 0.62rem;
@@ -149,6 +156,11 @@
       color: #8fdcff;
       font-weight: 700;
       font-size: 0.66rem;
+    }
+
+    .ingame-board-item:first-child .ingame-board-rank,
+    .ingame-board-item:first-child .ingame-board-score {
+      color: #ffd84d;
     }
 
     .ingame-board p {
@@ -755,10 +767,12 @@
     function renderInGameLeaderboard() {
       const visibleEntries = getVisibleLeaderboardEntries();
       if (visibleEntries.length === 0) {
+        ingameBoardEl.classList.remove("top-entry");
         ingameBoardEl.innerHTML = "<h3>Top 3</h3><p>7500+ pour entrer</p>";
         return;
       }
 
+      ingameBoardEl.classList.add("top-entry");
       ingameBoardEl.innerHTML =
         "<h3>Top 3</h3>" +
         '<div class="ingame-board-list">' +
@@ -1599,7 +1613,12 @@
 
       maybeSaveLeaderboardScore(state.score).then((leaderboardResult) => {
         if (leaderboardResult.added) {
-          renderLeaderboard(leaderboardResult.name + " entre dans le Top 3.");
+          const rank = leaderboardResult.board.findIndex((entry) => entry.name === leaderboardResult.name && entry.score === Math.round(state.score)) + 1;
+          if (rank === 1) {
+            renderLeaderboard(leaderboardResult.name + " prend la premiere place.");
+          } else {
+            renderLeaderboard(leaderboardResult.name + " entre dans le Top 3.");
+          }
         } else if (state.score > LEADERBOARD_PROMPT_MIN) {
           renderLeaderboard("Beau score. Il fallait un peu plus pour rentrer dans le Top 3.");
         } else {
