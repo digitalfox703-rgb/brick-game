@@ -97,15 +97,16 @@
     .ingame-board {
       position: absolute;
       left: 10px;
-      top: 10px;
-      width: min(148px, 34vw);
-      padding: 8px 9px;
-      border-radius: 16px;
-      background: rgba(8, 16, 35, 0.26);
+      top: 48px;
+      width: min(126px, 29vw);
+      padding: 6px 7px;
+      border-radius: 14px;
+      background: rgba(8, 16, 35, 0.2);
       border: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(8px);
+      backdrop-filter: blur(6px);
       pointer-events: none;
-      box-shadow: 0 10px 26px rgba(0, 0, 0, 0.16);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.14);
+      opacity: 0.88;
     }
 
     .ingame-board.top-entry {
@@ -116,8 +117,8 @@
     }
 
     .ingame-board h3 {
-      margin: 0 0 6px;
-      font-size: 0.62rem;
+      margin: 0 0 4px;
+      font-size: 0.55rem;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: rgba(255, 226, 143, 0.92);
@@ -125,18 +126,18 @@
 
     .ingame-board-list {
       display: grid;
-      gap: 4px;
+      gap: 3px;
     }
 
     .ingame-board-item {
       display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 4px 6px;
-      border-radius: 10px;
+      gap: 5px;
+      padding: 3px 5px;
+      border-radius: 9px;
       background: rgba(255, 255, 255, 0.04);
       color: rgba(244, 247, 255, 0.9);
-      font-size: 0.68rem;
+      font-size: 0.61rem;
     }
 
     .ingame-board-rank {
@@ -155,7 +156,7 @@
     .ingame-board-score {
       color: #8fdcff;
       font-weight: 700;
-      font-size: 0.66rem;
+      font-size: 0.6rem;
     }
 
     .ingame-board-item:first-child .ingame-board-rank,
@@ -166,7 +167,7 @@
     .ingame-board p {
       margin: 0;
       color: rgba(207, 224, 255, 0.78);
-      font-size: 0.68rem;
+      font-size: 0.6rem;
       line-height: 1.25;
     }
 
