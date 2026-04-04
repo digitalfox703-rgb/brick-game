@@ -2,6 +2,6 @@
   "name": "brick-color-splash",
   "private": true,
   "dependencies": {
-    "@vercel/kv": "^1.0.1"
+    "redis": "^4.7.0"
   }
 }

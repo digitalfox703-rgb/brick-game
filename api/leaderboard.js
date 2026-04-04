@@ -1,4 +1,4 @@
-const { kv } = require("@vercel/kv");
+const { createClient } = require("redis");
 
 const KEY = "brick-color-splash:leaderboard";
 const MAX_ENTRIES = 3;
@@ -18,16 +18,41 @@ function normalizeEntries(entries) {
 }
 
 async function readEntries() {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) return null;
+
+  const client = createClient({ url: redisUrl });
   try {
-    const entries = await kv.get(KEY);
+    await client.connect();
+    const raw = await client.get(KEY);
+    const entries = raw ? JSON.parse(raw) : [];
     return normalizeEntries(entries);
   } catch (error) {
     return null;
+  } finally {
+    try {
+      await client.quit();
+    } catch (error) {
+    }
   }
 }
 
 async function writeEntries(entries) {
-  await kv.set(KEY, entries);
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    throw new Error("missing_redis_url");
+  }
+
+  const client = createClient({ url: redisUrl });
+  try {
+    await client.connect();
+    await client.set(KEY, JSON.stringify(entries));
+  } finally {
+    try {
+      await client.quit();
+    } catch (error) {
+    }
+  }
 }
 
 function parseBody(req) {
